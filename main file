@@ -1,0 +1,104 @@
+import folium
+import pandas as pd
+import geopandas as gpd
+import folium.plugins
+import folium.plugins as plugins
+from IPython.display import display
+from IPython.display import Image
+from ipywidgets import Button, Layout
+
+
+'''
+create a web map from excel file with longitute \lattitude (alredy converted from isreal tm grid)
+the excel file have those columns:
+name	num 	x	y	longitude	latitude	label	category
+label field must be defined string. if there is  \ sign as link- we will write
+\\ insteed.
+
+legend symbology can be change from:
+https://fontawesome.com/search
+'''
+
+# Create a map object centered on Israel
+m = folium.Map(location=[31.0461, 34.8516], zoom_start=8, crs='EPSG3857')
+
+# Load the shapefile into a GeoDataFrame
+gdf = gpd.read_file(r"D:\PROJECTS\JerusalemCenter1\gis\lyr\Export_Output.shp")
+
+# Add the shapefile to the map
+folium.GeoJson(gdf, style_function=lambda x: {
+    'fillColor': 'blue',  # transparent
+    'color': 'blue',
+    'weight': 1,
+    'fillOpacity': 0,
+}).add_to(m)
+
+# # Convert the GeoDataFrame to a GeoJSON and add it to the map
+# folium.GeoJson(gdf).add_to(m)
+
+# Add the MousePosition control to the map
+folium.plugins.MousePosition(position='bottomleft', separator=' | ', add_last_point=True).add_to(m)
+
+# Load the data from an Excel file into a DataFrame
+df = pd.read_excel("data.xlsx", sheet_name="Sheet1")
+
+# Convert the 'coordinates' column of the DataFrame to a list
+coordinates = df[['latitude', 'longitude']].values.tolist()
+
+# Convert the 'label' and 'category' columns of the DataFrame to lists
+labels = df['label'].tolist()
+categories = df['category'].tolist()
+
+# Create a marker for each set of coordinates with the corresponding label
+# and add it to a marker cluster
+marker_cluster = folium.plugins.MarkerCluster().add_to(m)
+for coord, label, category in zip(coordinates, labels, categories):
+    icon = None
+    if category == 'TLV':
+        icon = folium.Icon(icon='map-marker', prefix='fa', color='blue')
+    elif category == 'Netanya':
+        icon = folium.features.CustomIcon(
+            r"D:\GIS\taza\3_hahotrim\yaron\shonot\software\---gis---\tools\YARON_SCRIPTS\general\netanya.png",
+            icon_size=(30, 30))
+    elif category == 'Haifa':
+        icon = folium.Icon(icon='map-marker', prefix='fa', color='green')
+    folium.Marker(location=coord, popup=label, icon=icon).add_to(marker_cluster)
+
+# Add a OpenStreetMap Aerial layer to the map
+folium.TileLayer(url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                 attr='Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors',
+                 overlay=True, name='TM Grid Layer').add_to(m)
+
+folium.TileLayer(
+    tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attr='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+    overlay=True,
+    name='Aerial Map Layer'
+).add_to(m)
+
+# Add a list layers
+folium.LayerControl().add_to(m)
+
+Image(filename='D:/GIS/taza/3_hahotrim/yaron/shonot/software/---gis---/tools/YARON_SCRIPTS/General/netanya.png')
+
+
+
+# Add a legend to the map
+legend_html = '''
+     <div style="position: fixed; 
+     bottom: 40px; left: 50px; width: 100px; height: 110px; 
+     border:2px solid grey; z-index:9999; font-size:14px;
+     background-color: white;
+     ">&nbsp; Legend <br>
+     &nbsp; aaa &nbsp;          <i class="fa fa-map-marker" style="color:blue"></i><br>
+     &nbsp; bbb &nbsp;      <i class="fa fa-truck" style="color:pink"></i><br>
+     &nbsp; ccc &nbsp;        <i class="fa fa-map-marker" style="color:green"></i><br>
+     &nbsp; shapefile &nbsp;    <img src= "D:\GIS\taza\3_hahotrim\yaron\shonot\software\---gis---\tools\YARON_SCRIPTS\general\netanya.png" width="10" height="10"> 
+
+     </div>
+     '''
+
+#      &nbsp; shapefile &nbsp;    <i class="fa fa-square" style="color:transparent; background-color:transparent; border: 1px solid blue; width:10px; height:10px"></i>
+m.get_root().html.add_child(folium.Element(legend_html))
+
+m.save('israel_map.html')
